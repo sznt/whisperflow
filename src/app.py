@@ -1,3 +1,4 @@
+import sys
 import threading
 import numpy as np
 import rumps
@@ -5,6 +6,10 @@ import rumps
 
 class WhisperFlowApp(rumps.App):
     def __init__(self):
+        from src.permissions import check_and_request_permissions
+        if not check_and_request_permissions():
+            sys.exit(1)
+
         from src.audio_recorder import AudioRecorder
         from src.transcriber import Transcriber
         from src.hotkey_listener import HotkeyListener
