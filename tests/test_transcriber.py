@@ -29,7 +29,7 @@ def test_transcribe_empty_audio_returns_empty(mock_whisper_model):
     assert result == ""
 
 
-def test_transcribe_calls_with_auto_language(mock_whisper_model):
+def test_transcribe_calls_with_auto_language_and_no_conditioning(mock_whisper_model):
     from src.transcriber import Transcriber
     mock_whisper_model.return_value.transcribe.return_value = ([], MagicMock())
 
@@ -37,7 +37,13 @@ def test_transcribe_calls_with_auto_language(mock_whisper_model):
     audio = np.zeros(16000, dtype="float32")
     t.transcribe(audio)
 
-    mock_whisper_model.return_value.transcribe.assert_called_once_with(audio, language=None)
+    mock_whisper_model.return_value.transcribe.assert_called_once_with(
+        audio,
+        language=None,
+        task="transcribe",
+        condition_on_previous_text=False,
+        beam_size=5,
+    )
 
 
 def test_transcriber_loads_medium_model(mock_whisper_model):

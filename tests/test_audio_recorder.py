@@ -1,19 +1,25 @@
 import numpy as np
 import pytest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 
-def test_start_opens_stream(mock_sounddevice):
+@pytest.fixture
+def mock_sounddevice():
+    with patch("src.audio_recorder.sd") as mock_sd:
+        mock_sd.InputStream.return_value = MagicMock()
+        yield mock_sd
+
+
+def test_start_opens_stream_with_blocksize(mock_sounddevice):
     from src.audio_recorder import AudioRecorder
     recorder = AudioRecorder()
     recorder.start()
-    mock_sounddevice.InputStream.assert_called_once_with(
-        samplerate=16000,
-        channels=1,
-        dtype="float32",
-        callback=recorder._callback,
-    )
-    mock_sounddevice.InputStream.return_value.__enter__ = MagicMock()
+    call_kwargs = mock_sounddevice.InputStream.call_args[1]
+    assert call_kwargs["samplerate"] == 16000
+    assert call_kwargs["channels"] == 1
+    assert call_kwargs["dtype"] == "float32"
+    assert call_kwargs["callback"] == recorder._callback
+    assert "blocksize" in call_kwargs
     mock_sounddevice.InputStream.return_value.start.assert_called_once()
 
 
@@ -21,7 +27,6 @@ def test_stop_returns_concatenated_audio(mock_sounddevice):
     from src.audio_recorder import AudioRecorder
     recorder = AudioRecorder()
     recorder.start()
-    # Simulate two callback calls
     chunk1 = np.array([[0.1], [0.2]], dtype="float32")
     chunk2 = np.array([[0.3], [0.4]], dtype="float32")
     recorder._callback(chunk1, 2, None, None)
@@ -40,9 +45,22 @@ def test_stop_with_no_audio_returns_empty(mock_sounddevice):
     assert len(audio) == 0
 
 
-@pytest.fixture
-def mock_sounddevice():
-    with patch("src.audio_recorder.sd") as mock_sd:
-        stream = MagicMock()
-        mock_sd.InputStream.return_value = stream
-        yield mock_sd
+def test_get_snapshot_returns_audio_without_stopping(mock_sounddevice):
+    from src.audio_recorder import AudioRecorder
+    recorder = AudioRecorder()
+    recorder.start()
+    chunk = np.array([[0.1], [0.2]], dtype="float32")
+    recorder._callback(chunk, 2, None, None)
+    snapshot = recorder.get_snapshot()
+    np.testing.assert_array_almost_equal(snapshot, np.array([0.1, 0.2]))
+    # Stream should still be running
+    mock_sounddevice.InputStream.return_value.stop.assert_not_called()
+
+
+def test_last_rms_updated_by_callback(mock_sounddevice):
+    from src.audio_recorder import AudioRecorder
+    recorder = AudioRecorder()
+    recorder.start()
+    chunk = np.array([[0.5], [0.5]], dtype="float32")
+    recorder._callback(chunk, 2, None, None)
+    assert recorder.last_rms > 0.0
