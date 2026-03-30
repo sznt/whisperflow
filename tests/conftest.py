@@ -28,3 +28,20 @@ import types as _types
 _fw = sys.modules["faster_whisper"]
 if not hasattr(_fw, "WhisperModel"):
     _fw.WhisperModel = type("WhisperModel", (), {})
+
+# Stub out pynput so tests run without a system keyboard backend.
+# The Quartz stub above breaks pynput's macOS backend, so we must pre-stub
+# pynput before src.hotkey_listener is imported.
+for mod in ["pynput", "pynput.keyboard"]:
+    if mod not in sys.modules:
+        sys.modules[mod] = types.ModuleType(mod)
+
+# Provide a GlobalHotKeys class on the stub so patch() can target it.
+_kb = sys.modules["pynput.keyboard"]
+if not hasattr(_kb, "GlobalHotKeys"):
+    _kb.GlobalHotKeys = type("GlobalHotKeys", (), {})
+
+# Make pynput.keyboard accessible as an attribute of the pynput stub.
+_pynput = sys.modules["pynput"]
+if not hasattr(_pynput, "keyboard"):
+    _pynput.keyboard = _kb
