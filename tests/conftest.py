@@ -9,6 +9,14 @@ for mod in [
     if mod not in sys.modules:
         sys.modules[mod] = types.ModuleType(mod)
 
+# Add NSEvent + NSEventMaskKeyDown to the AppKit stub so hotkey_listener imports cleanly.
+from unittest.mock import MagicMock as _MagicMock
+_appkit = sys.modules["AppKit"]
+if not hasattr(_appkit, "NSEvent"):
+    _appkit.NSEvent = _MagicMock()
+if not hasattr(_appkit, "NSEventMaskKeyDown"):
+    _appkit.NSEventMaskKeyDown = 1024
+
 # Stub out faster_whisper and its transitive dependencies so tests run without
 # the full ML stack installed.
 for mod in [
