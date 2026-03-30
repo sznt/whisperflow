@@ -1,4 +1,3 @@
-import sys
 import threading
 import numpy as np
 import rumps
@@ -6,9 +5,38 @@ import rumps
 
 class WhisperFlowApp(rumps.App):
     def __init__(self):
+        super().__init__("WhisperFlow", title="🎤", quit_button="Quit")
+        self.menu = ["About WhisperFlow"]
+
+        self._state = "idle"  # idle | recording | transcribing
+        self._recorder = None
+        self._overlay = None
+        self._injector = None
+        self._transcriber = None
+        self._listener = None
+
+        # Defer permission check + component init until the run loop is live
+        self._init_timer = rumps.Timer(self._deferred_init, 0.5)
+        self._init_timer.start()
+
+    def _deferred_init(self, _timer) -> None:
+        self._init_timer.stop()
+
         from src.permissions import check_and_request_permissions
         if not check_and_request_permissions():
-            sys.exit(1)
+            rumps.alert(
+                title="Permissions Required",
+                message=(
+                    "WhisperFlow needs two permissions to work:\n\n"
+                    "1. System Settings → Privacy & Security → Accessibility\n"
+                    "   Add Terminal (or WhisperFlow.app) and enable it.\n\n"
+                    "2. System Settings → Privacy & Security → Input Monitoring\n"
+                    "   Add Terminal (or WhisperFlow.app) and enable it.\n\n"
+                    "After granting both, relaunch the app."
+                ),
+            )
+            rumps.quit_application()
+            return
 
         from src.audio_recorder import AudioRecorder
         from src.transcriber import Transcriber
@@ -16,10 +44,6 @@ class WhisperFlowApp(rumps.App):
         from src.text_injector import TextInjector
         from src.overlay import Overlay
 
-        super().__init__("WhisperFlow", title="🎤", quit_button="Quit")
-        self.menu = ["About WhisperFlow"]
-
-        self._state = "idle"  # idle | recording | transcribing
         self._recorder = AudioRecorder()
         self._overlay = Overlay()
         self._injector = TextInjector()
